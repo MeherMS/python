@@ -1,0 +1,10 @@
+[[ 0  2]
+ [ 0 13]] 
+               precision    recall  f1-score   support
+
+           0       0.00      0.00      0.00         2
+           1       0.87      1.00      0.93        13
+
+   micro avg       0.87      0.87      0.87        15
+   macro avg       0.43      0.50      0.46        15
+weighted avg       0.75      0.87      0.80        15

@@ -1,0 +1,13 @@
+<expr>نقل عن</expr>
+<expr>اي</expr>
+<expr>عبر</expr>
+<expr>مثال</expr>
+<expr>غير ممكن</expr>
+<expr>غير ممثل</expr>
+<expr>قال</expr>
+<expr>قالت</expr>
+<expr>قالوا</expr>
+<expr>وقال</expr>
+<expr>وقالت</expr>
+<expr>يقول</expr>
+<expr>ويقول</expr>
