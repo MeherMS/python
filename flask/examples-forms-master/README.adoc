@@ -1,0 +1,295 @@
+= Forms in Flask
+
+An HTML form a the primary user interface element that allows
+a web application user to send data back to the web server.
+
+== Get vs Post
+
+When submitting a form,
+a web browser makes an HTTP POST request to the server
+(see http://www.w3schools.com/tags/ref_httpmethods.asp[Get vs Post]).
+A POST request indicates that the server should handle data submitted by the user
+(e.g., by storing something in the application's database).
+This is in contrast to a GET request,
+which is the usual way to request data from the web server
+without causing anything to be stored in the application database.
+
+== Form Handling
+
+Handling an HTML form usually proceeds as follows:
+
+. The browser sends a GET request to retrieve the HTML page that contains the empty form
+. The user fills out the form and hits a `submit` button
+. The browser sends a POST request to the server; the POST request contains the data entered into the form by the user
+. The server recieves the POST request and validates the contents of the form
+  (e.g., checks for any missing or malformed fields)
+. If the form passes validation
+.. The server acts on the form data
+   (e.g., registers a new user, logs in a user, creates a new order, adds a product to a shopping cart, etc.)
+.. The server _redirects_ the browser to a confirmation page
+. If the form fails validation
+.. The server returns the partially completed form to ther user,
+   usually with an indication of the reason(s) that the form failed to validate
+.. The user updates the form and resubmits it for re-validation
+
+== Form Handling in Flask
+
+The following markup shows a simple form that
+requests a users first and last names.
+The form contains
+
+* A `method` attribute of `POST`, which informs the browser to use a POST
+  request when sending the form to the server
+* A `submit` element that the user clicks to cause the POST request to be sent
+* For each field in the form, an `input` element of the appropriate type
+  (in this case both are `text` elements)
+  that also have a `name` attribute.
+  The `name` attribute is what identifies the value of the form field
+  when the form is submitted to the server.
+
+[source,html]
+.sign-up.html
+----
+<form method="POST">
+    <p>
+        <label for="first">First Name</label>
+        <input id="first" name="firstname" type="text">
+    </p>
+    <p>
+        <label for="last">Last Name</label>
+        <input id="last" name="lastname" type="text">
+    </p>
+    <input type="submit" value="Sign Me Up">
+</form>
+----
+
+By default, a Flask view function responds only to GET requests.
+In order to let Flask know that the view function should respond to _both_
+GET and POST requests, supply the `methods` argument to the `route` method as shown below.
+(There are other HTTP verbs to which Flask can respond, but these are the most common.)
+
+[source,python]
+----
+@app.route('/sign-up', methods=['GET', 'POST'])
+----
+
+Having specified that the view function can respond to GET or POST requests,
+the code needs to determine which request has actually been received.
+Flask's built-in `request` object gives the view function access to
+all the information contained in the HTTP request object.
+Two attributes of the request object are commonly used.
+
+. The `method` attribute contains a string indicating the type of HTTP request (`GET` or `POST`)
+. The 'form` attribute acts like a dictionary, giving access to the value supplied to each form field.
+  The dictionary's keys correspond to the `name` attributes provided to each `input` element in the form.
+
+A common design pattern for a view function that handles forms is to structure it as follows:
+
+----
+If handling a POST:
+    Extract form details
+    If form is not valid:
+        Create error message
+    Else:
+        Redirect to confirmation page
+Send the form to the browser
+----
+
+The initial request for the page containing a form
+will be a GET request, so all the code that handles a POST will be skipped.
+The function sends the (empty) form to the browser.
+
+When the form is submitted,
+the browser will issue a POST request.
+The view function extracts details from the form
+and uses this information to validate the request.
+If validation fails, the function creates one or more error messages
+and resends the form to the user with the error messages included.
+If the validation succeeds,
+the function redirects the browser to a confirmation page.
+
+Here is a view function that processes the form from `sign-up.html`.
+
+[source,python]
+----
+@app.route('/sign-up', methods=['GET', 'POST'])
+def sign_up():
+    error = ""
+    if request.method == 'POST':
+        # Form being submitted; grab data from form.
+        first_name = request.form['firstname']
+        last_name = request.form['lastname']
+
+        # Validate form data
+        if len(first_name) == 0 or len(last_name) == 0:
+            # Form data failed validation; try again
+            error = "Please supply both first and last name"
+        else:
+            # Form data is valid; move along
+            return redirect(url_for('thank_you'))
+
+    # Render the sign-up page
+    return render_template('sign-up.html', message=error)
+----
+
+If the request is a POST,
+the function extracts the content of the form from the `request.form`
+dictionary, using the `name` attributes from the HTML `input` elements
+as keys.
+
+The function does only trivial validation, checking that both fields have a non-empty value.
+If either field is empty,
+the function sets the `error` variable to an error string.
+There is nothing special about the `error` variable; it's an ordinary Python variable.
+The value of the error variable will be passed to the template
+for display to the user.
+
+If the form passes validation,
+the user will be redirected to a conformation page.
+In a real application,
+the view function would first process the form
+(e.g., storing information in the application database).
+
+== Error Handling
+
+The Python code above sets the `error` variable to an error message
+if the form content fails validation.
+It passes this value to the `render_template` method with the template variable name `message`.
+
+Because we want the ability to include messages on most any HTML page in our application,
+the rendering of the `message` template variable is part of the `base.html` template.
+Here's the `body` element of the template.
+
+[source,html]
+----
+<body>
+    {% if message %}
+        <p>Note: {{ message }}</p>
+    {% endif %}
+    {% block content %}
+    {% endblock %}
+</body>
+----
+
+This template uses another template directive, the `{% if ... %}` directive.
+The directive takes an argument that is evaluated for its logical value.
+If the value is _truthy_,
+the markup between the `{% if ... %}` and `{% endif %}` directives is rendered into the output.
+In the previous example,
+the output will contain the `p` element with the associated message if the message is set to a _truthy_ value.
+
+.Truth in Python
+****
+Most values in Python are considered logically true,
+which Python refers to at _truthy_.
+Values that are not considered _truthy_
+include:
+
+* Python values `None` and `False`
+* Zero of any numeric type,
+* An empty string, tuple, array, or dictionary.
+****
+
+Referring back to the `sign_up` view function,
+you'll see that the default value to which `error` is initialized is the empty string,
+which in Python is _not_ truthy.
+Thus, if `sign_up` detects no problem with the form,
+the value of the `message` template variable will _not_ trigger the rendering of an error message.
+However, if there _is_ a problem with form validation,
+the `error` variable will be set to a non-empty string,
+which Python considers _truthy_
+and will therefore cause the error message to be included in the HTML generated by the template.
+
+== Browser Redirection
+
+The final case handled by the `sign_up` view function is
+that in which the form data is valid (the `else` clause in the validation logic).
+In a real application, this would be the place
+where the view function would do something useful
+(e.g., register a new user, charge someone's credit card, etc.).
+At issue is what happens _next_.
+
+One thing we generally do _not_ want to do next is to leave the browser
+on the same page with the form that was just processed successfully by the view function.
+For example, if this was the page that purchased a product
+and the user was to either reload the page or click the submit button again,
+he or she would be charged _again_ for the purchase.
+
+Instead, the typical behavior after a form is submitted successfully
+is to redirect the browser to a different page
+that confirms the successful outcome associated with the form.
+For example, if the user had just registered for a new account by submitting the form,
+the confirmation page might be the main page for a registered user.
+
+To send the browser to a different page on the site,
+the view function returns an HTTP redirect response to the brower.
+On receiving the redirect, the browser will issue a fresh GET request
+to retrieve the content of the page to which it's been redirected.
+This all happens behind the scenes;
+most web users are unaware of this "extra" page request being generated.
+The only direct evidence of the redirect
+is that the URL that appears in the browser address bar will change.
+
+Importantly, following the redirect,
+should the user reaload the page with the browser's "refresh" button,
+the page that will be reloaded will be the _confirmation_ page,
+and _not_ the page containing the form that has already been processed by the view function.
+
+To send the browser redirect response,
+the view function uses the Flask `redirect` function.
+The argument to `redirect` is a string containing the URL
+that the browser should request.
+In order to redirect to the page whose URL is `/thank-you`,
+we could do this:
+
+[source,python]
+----
+# Don't to this!
+return redirect('/thank-you')
+----
+
+Although it's possible to hard-code the new URL in the `redirect` call,
+doing so violates the DRY ("Don't Repeat Yourself") principle.
+The URL for the new page will already be stored in the `app.route`
+decorate for that page.
+If we hard-code the URL in the `redirect` method,
+there will be multiple copies of the URL at different locations in the code.
+If we decide in the future to change the URLs used by the application,
+we'll have to remember to change it in multiple locations,
+opening up the possibility that we'll miss some occurrences or that we'll
+change them inconsistently.
+
+Instead, the view function should use Flask's `url_for` function.
+This function takes the name of the _view function_ associated
+with the page to which we want to redirect the user.
+It returns the URL from the associated `app.route` for that view function.
+The preferred way to write the previous redirect is like this:
+
+[source,python]
+----
+# Do this instead!
+return redirect(url_for('thank_you'))
+----
+
+In this way, the URL is only set _once_: in the `app.route` decorater.
+If we change the URL in the future,
+the new value will automatically be returned by any `url_for` function
+that references the view function.
+
+There is a pleasant symmetry between `app.route` and `url_for`.
+
+* `app.route` maps the URL received by the server
+  to the view function that handles it.
+* `url_for` maps the view function
+  to the URL that invokes it.
+
+== More Information
+
+* http://www.w3schools.com/html/html_forms.asp[Forms tutorial] from W3Schools
+* http://flask.pocoo.org/docs/0.10/quickstart/#the-request-object[Flask request object overview]
+* http://flask.pocoo.org/docs/0.10/api/#incoming-request-data[Flask request object reference]
+* http://flask.pocoo.org/docs/0.10/tutorial/views/[View functions] in Flask
+* http://flask.pocoo.org/docs/0.10/patterns/wtforms/[Form validation with WTForms]
+* https://flask-wtf.readthedocs.org/en/latest/[Flask-WTF extension] for WTForms
+* http://wtforms.readthedocs.org/en/latest/[WTForms home page]
+
